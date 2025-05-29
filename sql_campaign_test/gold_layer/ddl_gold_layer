@@ -42,7 +42,6 @@ SELECT
     Likes,
     Shares,
     Comments,
-    DWH_Create_Date,
 
     -- ===============================
     -- KPI Metrics
@@ -89,6 +88,8 @@ SELECT
         WHEN Conversions > 0 AND Revenue < Ad_Spend THEN 'Loss-Making'
         ELSE 'Healthy'
     END AS Performance_Flag
+
+    DWH_Create_Date
 
 FROM silver.marketing_campaign;
 GO
