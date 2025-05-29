@@ -1,0 +1,101 @@
+/*
+===============================================================================
+Stored Procedure: Load Silver Layer (Bronze -> Silver)
+===============================================================================
+Script Purpose:
+    This stored procedure performs the ETL (Extract, Transform, Load) process to 
+    populate the 'silver' schema tables from the 'bronze' schema.
+	Actions Performed:
+		- Truncates Silver tables.
+		- Inserts transformed and cleansed data from Bronze into Silver tables.
+		
+Parameters:
+    None. 
+	  This stored procedure does not accept any parameters or return any values.
+
+Usage Example:
+    EXEC Silver.load_silver;
+===============================================================================
+*/
+
+CREATE OR ALTER PROCEDURE silver.load_silver AS
+BEGIN
+	DECLARE @start_time DATETIME, @end_time DATETIME, @batch_start_time DATETIME, @batch_end_time DATETIME;
+	BEGIN TRY
+		SET @batch_start_time = GETDATE();
+		PRINT '==================================================';
+		PRINT 'Loading Silver Layer';
+		PRINT '==================================================';
+
+		PRINT '--------------------------------------------------';
+		PRINT 'Loading CRM Table';
+		PRINT '--------------------------------------------------';
+
+
+		-- Loading silver.marketing_campaign
+		SET @start_time = GETDATE();
+    			PRINT'>> Truncating Table: silver.marketing_campaign';
+    			TRUNCATE TABLE silver.marketing_campaign;
+    			PRINT'>> Inserting Data Into: silver.marketing_campaign';
+          INSERT INTO silver.marketing_campaign (
+              Campaign,
+              Date,
+              City,
+              Latitude,
+              Longitude,
+              Channel,
+              Device,
+              Ad,
+              Impressions,
+              CTR,
+              Clicks,
+              CPC,
+              Ad_Spend,
+              Conversions,
+              Revenue,
+              Likes,
+              Shares,
+              Comments,
+              DWH_Create_Date
+          )
+          SELECT
+              [Campaign],
+              TRY_CAST([Date] AS DATE) AS Date,
+              TRIM([City/Location]) AS City,
+              [Latitude],
+              [Longitude],
+              [Channel],
+              [Device],
+              [Ad],
+              ROUND(TRY_CAST([Impressions] AS FLOAT), 0) AS Impressions,
+              ROUND(TRY_CAST(REPLACE([CTR, %], '%', '') AS FLOAT) / 100.0, 2) AS CTR,
+              [Clicks],
+              [Daily Avg. CPC] AS CPC,
+              [Spend (GBP)] AS Ad_Spend,
+              [Conversions],
+              [Total Conversion Value (GBP)] AS Revenue,
+              [Likes],
+              [Shares],
+              [Comments],
+              GETDATE() AS DWH_Create_Date
+          FROM bronze.marketing_campaign;
+    SET @end_time = GETDATE();
+    		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + 'seconds';
+    		PRINT '>>--------------------'
+
+        SET @batch_end_time = GETDATE();
+		PRINT '=================================================='
+		PRINT 'Loading Silver Layer is Complete';
+		PRINT ' - Total Load Duration: ' + CAST(DATEDIFF(second, @batch_start_time, @batch_end_time) AS NVARCHAR) + 'seconds';
+		PRINT '=================================================='
+	
+	END TRY
+	BEGIN CATCH
+		PRINT '=================================================='
+		PRINT 'ERROR OCURED DURING LOADING SILVER LAYER'
+		PRINT 'Error Message' + ERROR_MESSAGE();
+		PRINT 'Error Message' + CAST (ERROR_NUMBER() AS NVARCHAR);
+		PRINT 'Error Message' + CAST (ERROR_STATE() AS NVARCHAR);
+		PRINT '=================================================='
+	END CATCH
+END
