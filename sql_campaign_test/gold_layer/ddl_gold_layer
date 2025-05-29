@@ -1,0 +1,32 @@
+-- Metrics columns calculated
+	ROUND(CASE 
+        WHEN ISNULL(Impressions, 0) = 0 THEN 0
+        ELSE ([Spend, GBP] / Impressions) * 1000
+    END, 2) AS CPM,
+	ROUND(CASE 
+        WHEN Clicks = 0 THEN 0
+        ELSE ISNULL([Total conversion value, GBP], 0) / Clicks
+    END, 2) AS RPC,
+	ROUND(CASE 
+        WHEN Clicks = 0 THEN 0
+        ELSE (CAST(Conversions AS FLOAT) / Clicks) * 100
+    END, 1) AS Conversion_Rate,
+	ROUND(CASE 
+        WHEN Conversions = 0 THEN 0
+        ELSE ISNULL([Total conversion value, GBP], 0) / Conversions
+    END, 2) AS RPCon,
+	ROUND(CASE 
+        WHEN ISNULL(Impressions, 0) = 0 THEN 0
+        ELSE (CAST([Likes (Reactions)] + Shares + Comments AS FLOAT) / Impressions) * 100
+    END, 1) AS Engagement_Rate,
+    ROUND(ISNULL([Total conversion value, GBP], 0) - ISNULL([Spend, GBP], 0), 2) AS Profit,
+    ROUND(CASE 
+        WHEN ISNULL([Spend, GBP], 0) = 0 THEN 0
+        ELSE ISNULL([Total conversion value, GBP], 0) / [Spend, GBP]
+    END, 2) AS ROAS,
+    ROUND(CASE 
+        WHEN ISNULL([Spend, GBP], 0) = 0 THEN 0
+        ELSE ((ISNULL([Total conversion value, GBP], 0) - [Spend, GBP]) / [Spend, GBP]) * 100
+    END, 1) AS ROI,
+    GETDATE() AS DWH_Create_Date
+FROM bronze.marketing_campaign;
