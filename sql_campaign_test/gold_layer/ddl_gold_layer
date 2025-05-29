@@ -1,32 +1,93 @@
--- Metrics columns calculated
-	ROUND(CASE 
+/*
+===============================================================================
+DDL Script: Create Gold View – gold.fact_campaign
+===============================================================================
+Script Purpose:
+    This script creates a Gold Layer view from the Silver Layer's cleaned 
+    marketing campaign table. The view calculates business KPIs such as:
+    - CPM, RPC, Conversion Rate, RPCon
+    - Engagement Rate, Profit, ROAS, ROI
+    - Performance Flag
+    
+    This view is ready for direct use in dashboards and analytics tools.
+
+===============================================================================
+*/
+
+-- =============================================================================
+-- Create View: gold.fact_campaign
+-- =============================================================================
+IF OBJECT_ID('gold.fact_campaign', 'V') IS NOT NULL
+    DROP VIEW gold.fact_campaign;
+GO
+
+CREATE VIEW gold.fact_campaign AS
+SELECT
+    Campaign,
+    Date,
+    City,
+    Latitude,
+    Longitude,
+    Channel,
+    Device,
+    Ad,
+    Impressions,
+    CTR,
+    Clicks,
+    CPC,
+    Ad_Spend,
+    Conversions,
+    Revenue,
+    Likes,
+    Shares,
+    Comments,
+    DWH_Create_Date,
+
+    -- ===============================
+    -- KPI Metrics
+    -- ===============================
+
+    ROUND(CASE 
         WHEN ISNULL(Impressions, 0) = 0 THEN 0
-        ELSE ([Spend, GBP] / Impressions) * 1000
+        ELSE Ad_Spend / Impressions * 1000
     END, 2) AS CPM,
-	ROUND(CASE 
+
+    ROUND(CASE 
         WHEN Clicks = 0 THEN 0
-        ELSE ISNULL([Total conversion value, GBP], 0) / Clicks
+        ELSE Revenue / Clicks
     END, 2) AS RPC,
-	ROUND(CASE 
+
+    ROUND(CASE 
         WHEN Clicks = 0 THEN 0
-        ELSE (CAST(Conversions AS FLOAT) / Clicks) * 100
+        ELSE CAST(Conversions AS FLOAT) / Clicks * 100
     END, 1) AS Conversion_Rate,
-	ROUND(CASE 
+
+    ROUND(CASE 
         WHEN Conversions = 0 THEN 0
-        ELSE ISNULL([Total conversion value, GBP], 0) / Conversions
+        ELSE Revenue / Conversions
     END, 2) AS RPCon,
-	ROUND(CASE 
+
+    ROUND(CASE 
         WHEN ISNULL(Impressions, 0) = 0 THEN 0
-        ELSE (CAST([Likes (Reactions)] + Shares + Comments AS FLOAT) / Impressions) * 100
+        ELSE CAST(Likes + Shares + Comments AS FLOAT) / Impressions * 100
     END, 1) AS Engagement_Rate,
-    ROUND(ISNULL([Total conversion value, GBP], 0) - ISNULL([Spend, GBP], 0), 2) AS Profit,
+
+    ROUND(ISNULL(Revenue, 0) - ISNULL(Ad_Spend, 0), 2) AS Profit,
+
     ROUND(CASE 
-        WHEN ISNULL([Spend, GBP], 0) = 0 THEN 0
-        ELSE ISNULL([Total conversion value, GBP], 0) / [Spend, GBP]
+        WHEN ISNULL(Ad_Spend, 0) = 0 THEN 0
+        ELSE Revenue / Ad_Spend
     END, 2) AS ROAS,
+
     ROUND(CASE 
-        WHEN ISNULL([Spend, GBP], 0) = 0 THEN 0
-        ELSE ((ISNULL([Total conversion value, GBP], 0) - [Spend, GBP]) / [Spend, GBP]) * 100
+        WHEN ISNULL(Ad_Spend, 0) = 0 THEN 0
+        ELSE (Revenue - Ad_Spend) / Ad_Spend * 100
     END, 1) AS ROI,
-    GETDATE() AS DWH_Create_Date
-FROM bronze.marketing_campaign;
+
+    CASE 
+        WHEN Conversions > 0 AND Revenue < Ad_Spend THEN 'Loss-Making'
+        ELSE 'Healthy'
+    END AS Performance_Flag
+
+FROM silver.marketing_campaign;
+GO
