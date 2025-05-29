@@ -13,24 +13,24 @@ IF OBJECT_ID('silver.marketing_campaign', 'U') IS NOT NULL
 GO
 
 CREATE TABLE silver.marketing_campaign (
-    campaign               NVARCHAR(255),
-    campaign_date          DATE,
-    city                   NVARCHAR(255),
-    latitude               FLOAT,
-    longitude              FLOAT,
-    channel                NVARCHAR(100),
-    device                 NVARCHAR(100),
-    ad_name                NVARCHAR(255),
-    impressions            INT,         -- cleaned & formatted to number (no decimals)
-    ctr                    FLOAT,       -- cleaned: formatted from % to decimal (e.g. 0.02)
-    clicks                 INT,
-    daily_avg_cpc          FLOAT,
-    ad_spend               FLOAT,       -- renamed from "Spend, GBP"
-    conversions            INT,
-    revenue                FLOAT,       -- renamed from "Total conversion value, GBP"
-    likes                  INT,         -- renamed from "Likes (Reactions)"
-    shares                 INT,
-    comments               INT,
-    dwh_create_date        DATETIME2 DEFAULT GETDATE()
+    Campaign               NVARCHAR(255),
+    Date            	   DATE,
+    City                   NVARCHAR(255),
+    Latitude               FLOAT,
+    Longitude              FLOAT,
+    Channel                NVARCHAR(100),
+    Device                 NVARCHAR(100),
+    Ad	                   NVARCHAR(255),
+    Impressions            INT,         -- cleaned & formatted to number (no decimals)
+    CTR                    FLOAT,       -- cleaned: formatted from % to decimal (e.g. 0.02)
+    Clicks                 INT,
+    CPC		           FLOAT,
+    Ad_Spend               FLOAT,       -- renamed from "Spend, GBP"
+    Conversions            INT,
+    Revenue                FLOAT,       -- renamed from "Total conversion value, GBP"
+    Likes                  INT,         -- renamed from "Likes (Reactions)"
+    Shares                 INT,
+    Comments               INT,
+    DWH_Create_Date        DATETIME2 DEFAULT GETDATE()
 );
 GO
