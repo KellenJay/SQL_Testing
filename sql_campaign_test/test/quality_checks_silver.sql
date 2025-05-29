@@ -19,7 +19,7 @@ Usage Notes:
 
 -- ============================================================
 -- Check for duplicate records based on Campaign + Date + City
--- Expectation: No Duplicates
+-- Expectation: No rows should be returned if data is uniquely defined.
 SELECT 
     Campaign,
     Campaign_Date,
@@ -36,9 +36,9 @@ SELECT *
 FROM silver.marketing_campaign
 WHERE 
     Campaign IS NULL OR
-    Campaign_Date IS NULL OR
+    Date IS NULL OR
     City IS NULL OR
-    Ad_Name IS NULL OR
+    Ad IS NULL OR
     Impressions IS NULL OR
     CTR IS NULL OR
     Clicks IS NULL OR
@@ -91,3 +91,32 @@ FROM silver.marketing_campaign
 WHERE 
     Conversions > 0 AND
     Revenue < Ad_Spend;
+
+-- Validate the Business Logic
+SELECT 
+    Campaign, 
+    Date, 
+    Channel, 
+    Device,
+    Ad_Spend,
+    Revenue,
+    Conversions,
+    ROUND(Revenue - Ad_Spend, 2) AS Profit
+FROM silver.marketing_campaign
+WHERE 
+    Conversions > 0 AND
+    Revenue < Ad_Spend
+ORDER BY Profit ASC;
+
+-- Check for Zero or Low Revenue per Conversion
+SELECT 
+    Campaign, 
+    Revenue, 
+    Conversions, 
+    ROUND(Revenue / NULLIF(Conversions, 0), 2) AS RPCon
+FROM silver.marketing_campaign
+WHERE 
+    Conversions > 0 AND
+    Revenue < Ad_Spend
+ORDER BY RPCon ASC;
+
