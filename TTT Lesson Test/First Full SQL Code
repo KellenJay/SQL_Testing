@@ -1,0 +1,289 @@
+--Explore finished lesson table
+SELECT *
+FROM dbo.finished_lesson_test
+
+--Explore index lesson table
+SELECT *
+FROM dbo.lesson_index_test
+
+=========================================================================
+-- Exploring system bug
+-- Identifing users whose first data-analyst lesson was in April 2020
+WITH user_first_lesson AS (
+    SELECT 
+        fl.user_id,
+        MIN(fl.date_created) AS lesson_datetime
+    FROM finished_lesson_test fl
+    JOIN lesson_index_test li ON fl.lesson_id = li.lesson_id
+    WHERE li.profession_name = 'data-analyst' 
+    GROUP BY fl.user_id
+),
+april_cohort AS (
+    SELECT user_id
+    FROM user_first_lesson
+    WHERE lesson_datetime BETWEEN '2020-04-01' AND '2020-04-30'
+),
+-- Finding the fast lesson completions for this cohort
+ranked_lessons AS (
+    SELECT 
+        fl.user_id,
+        fl.lesson_id,
+        fl.date_created,
+        li.profession_name,
+        LEAD(fl.date_created) OVER (
+            PARTITION BY fl.user_id, li.profession_name ORDER BY fl.date_created
+        ) AS next_lesson_datetime
+    FROM finished_lesson_test fl
+    JOIN lesson_index_test li ON fl.lesson_id = li.lesson_id
+    WHERE li.profession_name = 'data-analyst'
+      AND fl.user_id IN (SELECT user_id FROM april_cohort)
+)
+SELECT
+	DATEDIFF(SECOND, date_created, next_lesson_datetime) AS delta_seconds,
+	date_created AS lesson_datetime,
+    lesson_id,
+    next_lesson_datetime,
+	profession_name,
+	user_id
+FROM ranked_lessons
+WHERE next_lesson_datetime IS NOT NULL
+    AND DATEDIFF(SECOND, date_created, next_lesson_datetime) < 5
+
+
+-- Bugs under 5 seconds for data-analyst across the (FULL DATASET)
+WITH completions AS (
+    SELECT 
+        fl.user_id,
+        fl.lesson_id,
+        fl.date_created,
+        li.profession_name,
+        LEAD(fl.date_created) OVER (
+            PARTITION BY fl.user_id, li.profession_name ORDER BY fl.date_created
+        ) AS next_lesson_datetime
+    FROM finished_lesson_test fl
+    JOIN lesson_index_test li ON fl.lesson_id = li.lesson_id
+    WHERE li.profession_name = 'data-analyst'
+),
+lesson_deltas AS (
+    SELECT
+        user_id,
+        lesson_id,
+        date_created AS lesson_datetime,
+        next_lesson_datetime,
+        DATEDIFF(SECOND, date_created, next_lesson_datetime) AS delta_seconds,
+        profession_name
+    FROM completions
+    WHERE next_lesson_datetime IS NOT NULL
+)
+SELECT 
+    user_id,
+    lesson_id,
+    lesson_datetime,
+    next_lesson_datetime,
+    delta_seconds,
+    profession_name
+FROM lesson_deltas
+WHERE delta_seconds < 5
+
+
+=========================================================================
+-- Exploring the Average Lesson Completion & Creating Distribution Buckets
+-- Identifing users whose first data-analyst lesson was in April 2020
+WITH user_first_lesson AS (
+    SELECT 
+        fl.user_id,
+        MIN(fl.date_created) AS lesson_datetime
+    FROM finished_lesson_test fl
+    JOIN lesson_index_test li ON fl.lesson_id = li.lesson_id
+    WHERE li.profession_name = 'data-analyst' 
+    GROUP BY fl.user_id
+),
+april_cohort AS (
+    SELECT user_id
+    FROM user_first_lesson
+    WHERE lesson_datetime BETWEEN '2020-04-01' AND '2020-04-30'
+),
+-- Finding the fast lesson completions for this cohort between 6-60 secs
+ranked_lessons AS (
+    SELECT 
+        fl.user_id,
+        fl.lesson_id,
+        fl.date_created,
+        li.profession_name,
+        LEAD(fl.date_created) OVER (
+            PARTITION BY fl.user_id, li.profession_name ORDER BY fl.date_created
+        ) AS next_lesson_datetime
+    FROM finished_lesson_test fl
+    JOIN lesson_index_test li ON fl.lesson_id = li.lesson_id
+    WHERE li.profession_name = 'data-analyst'
+      AND fl.user_id IN (SELECT user_id FROM april_cohort)
+),
+lesson_deltas AS (
+    SELECT
+        user_id,
+        lesson_id,
+        date_created,
+        next_lesson_datetime,
+        DATEDIFF(SECOND, date_created, next_lesson_datetime) AS delta_seconds,
+		DATEDIFF(MINUTE, date_created, next_lesson_datetime) AS delta_minutes,
+		DATEDIFF(HOUR, date_created, next_lesson_datetime) AS delta_hours
+    FROM ranked_lessons
+    WHERE next_lesson_datetime IS NOT NULL
+)
+SELECT
+    AVG(CAST(delta_seconds AS FLOAT)) AS avg_seconds_between_lessons,
+	AVG(CAST(delta_minutes AS FLOAT)) AS avg_minutes_between_lessons,
+	AVG(CAST(delta_hours AS FLOAT)) AS avg_hours_between_lessons,
+    COUNT(*) AS total_lesson_pairs,
+    SUM(CASE WHEN delta_seconds < 5 THEN 1 ELSE 0 END) AS under_5s,
+    SUM(CASE WHEN delta_seconds BETWEEN 5 AND 30 THEN 1 ELSE 0 END) AS between_5_30s,
+    SUM(CASE WHEN delta_seconds BETWEEN 31 AND 60 THEN 1 ELSE 0 END) AS between_31_60s,
+    SUM(CASE WHEN delta_seconds > 60 THEN 1 ELSE 0 END) AS over_60s
+FROM lesson_deltas
+
+
+-- Buckets for completions under 60s for data-analyst across (FULL DATASET)
+WITH completions AS (
+    SELECT 
+        fl.user_id,
+        fl.lesson_id,
+        fl.date_created,
+        li.profession_name,
+        LEAD(fl.date_created) OVER (
+            PARTITION BY fl.user_id, li.profession_name ORDER BY fl.date_created
+        ) AS next_lesson_datetime
+    FROM finished_lesson_test fl
+    JOIN lesson_index_test li ON fl.lesson_id = li.lesson_id
+    WHERE li.profession_name = 'data-analyst'
+),
+lesson_deltas AS (
+    SELECT
+        user_id,
+        lesson_id,
+        date_created,
+        next_lesson_datetime,
+        DATEDIFF(SECOND, date_created, next_lesson_datetime) AS delta_seconds
+    FROM completions
+    WHERE next_lesson_datetime IS NOT NULL
+)
+SELECT
+    COUNT(*) AS total_lesson_pairs,
+    SUM(CASE WHEN delta_seconds < 5 THEN 1 ELSE 0 END) AS under_5s,
+    SUM(CASE WHEN delta_seconds BETWEEN 5 AND 30 THEN 1 ELSE 0 END) AS between_5_30s,
+    SUM(CASE WHEN delta_seconds BETWEEN 31 AND 60 THEN 1 ELSE 0 END) AS between_31_60s,
+    SUM(CASE WHEN delta_seconds > 60 THEN 1 ELSE 0 END) AS over_60s
+FROM lesson_deltas
+
+
+=========================================================================
+-- Exploring bugs under 5 seconds across ALL professions
+WITH completions AS (
+    SELECT 
+        fl.user_id,
+        fl.lesson_id,
+        fl.date_created,
+        li.profession_name,
+        LEAD(fl.date_created) OVER (
+            PARTITION BY fl.user_id, li.profession_name ORDER BY fl.date_created
+        ) AS next_lesson_datetime
+    FROM finished_lesson_test fl
+    JOIN lesson_index_test li ON fl.lesson_id = li.lesson_id
+),
+lesson_deltas AS (
+    SELECT
+        user_id,
+        lesson_id,
+        profession_name,
+        date_created AS lesson_datetime,
+        next_lesson_datetime,
+        DATEDIFF(SECOND, date_created, next_lesson_datetime) AS delta_seconds
+    FROM completions
+    WHERE next_lesson_datetime IS NOT NULL
+)
+SELECT
+    profession_name,
+    COUNT(*) AS total_lesson_pairs,
+    SUM(CASE WHEN delta_seconds < 5 THEN 1 ELSE 0 END) AS under_5s,
+    SUM(CASE WHEN delta_seconds BETWEEN 5 AND 30 THEN 1 ELSE 0 END) AS between_5_30s,
+    SUM(CASE WHEN delta_seconds BETWEEN 31 AND 60 THEN 1 ELSE 0 END) AS between_31_60s,
+    SUM(CASE WHEN delta_seconds > 60 THEN 1 ELSE 0 END) AS over_60s
+FROM lesson_deltas
+GROUP BY profession_name
+ORDER BY under_5s DESC;
+
+=================================================================================
+-- Exploring Under-5-Second Lesson Completions by Profession & Time Granularity
+WITH completions AS (
+    SELECT 
+        fl.user_id,
+        fl.lesson_id,
+        fl.date_created,
+        li.profession_name,
+        LEAD(fl.date_created) OVER (
+            PARTITION BY fl.user_id, li.profession_name ORDER BY fl.date_created
+        ) AS next_lesson_datetime
+    FROM finished_lesson_test fl
+    JOIN lesson_index_test li ON fl.lesson_id = li.lesson_id
+),
+lesson_deltas AS (
+    SELECT
+        user_id,
+        lesson_id,
+        profession_name,
+        date_created,
+        next_lesson_datetime,
+        DATEDIFF(SECOND, date_created, next_lesson_datetime) AS delta_seconds
+    FROM completions
+    WHERE next_lesson_datetime IS NOT NULL
+)
+SELECT
+    profession_name,
+    user_id,
+    lesson_id,
+    date_created,
+    next_lesson_datetime,
+    delta_seconds
+FROM lesson_deltas
+WHERE delta_seconds < 5
+ORDER BY profession_name, date_created
+
+
+==============================================================================
+--Flagging bugs for alerts
+WITH completions AS (
+    SELECT 
+        fl.user_id,
+        fl.lesson_id,
+        fl.date_created,
+        li.profession_name,
+        LEAD(fl.date_created) OVER (
+            PARTITION BY fl.user_id, li.profession_name ORDER BY fl.date_created
+        ) AS next_lesson_datetime
+    FROM finished_lesson_test fl
+    JOIN lesson_index_test li ON fl.lesson_id = li.lesson_id
+),
+lesson_deltas AS (
+    SELECT
+        user_id,
+        lesson_id,
+        profession_name,
+        date_created AS lesson_datetime,
+        next_lesson_datetime,
+        DATEDIFF(SECOND, date_created, next_lesson_datetime) AS delta_seconds
+    FROM completions
+    WHERE next_lesson_datetime IS NOT NULL
+)
+SELECT
+    profession_name,
+    user_id,
+    lesson_id,
+    lesson_datetime,
+    next_lesson_datetime,
+    delta_seconds,
+    CASE
+        WHEN delta_seconds < 5 THEN 'BUG_FLAG'
+        WHEN delta_seconds BETWEEN 5 AND 60 THEN 'REVIEW_FLAG'
+        ELSE 'NORMAL'
+    END AS completion_flag
+FROM lesson_deltas
+ORDER BY profession_name, lesson_datetime;
