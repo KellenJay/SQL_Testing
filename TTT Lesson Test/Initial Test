@@ -1,0 +1,26 @@
+SELECT *
+FROM dbo.finished_lesson_test
+
+SELECT *
+FROM dbo.lesson_index_test
+
+-- Count of lessons completed per profession
+SELECT li.profession_name, 
+	   COUNT(*) AS total_completions
+FROM finished_lesson_test AS  fl
+	 JOIN lesson_index_test AS li 
+	 ON fl.lesson_id = li.lesson_id
+GROUP BY li.profession_name
+
+-- Timeline of completions for Data Analyst profession in April 2020
+SELECT fl.user_id, 
+	   fl.lesson_id, 
+	   li.lesson_name, 
+	   fl.date_created
+FROM finished_lesson_test fl
+     JOIN lesson_index_test li 
+     ON fl.lesson_id = li.lesson_id
+WHERE li.profession_name = 'data-analyst'
+      AND fl.date_created BETWEEN '2020-04-01' AND '2020-04-30'
+ORDER BY fl.user_id, 
+         fl.date_created;
